@@ -5,6 +5,8 @@ namespace console_snake_core
 {
     class Program
     {
+        private static bool running = true;
+
         enum Direction
         {
             North,
@@ -62,7 +64,7 @@ namespace console_snake_core
                 Console.Write("*");
             }
 
-            while (true)
+            while (running)
             {
                 if (Console.KeyAvailable)
                 {
@@ -132,6 +134,9 @@ namespace console_snake_core
                 case ConsoleKey.S:
                     if (dir != Direction.North)
                         dir = Direction.South;
+                    break;
+                case ConsoleKey.Escape:
+                    running = false;
                     break;
             }
 
