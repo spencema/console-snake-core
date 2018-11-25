@@ -3,170 +3,275 @@ using System.Collections.Generic;
 
 namespace console_snake_core
 {
+    enum Direction
+    {
+        North,
+        East,
+        South,
+        West
+    }
+
+    struct Position
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        public Position(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public static bool operator ==(Position lhs, Position rhs)
+        {
+            return lhs.X == rhs.X && lhs.Y == rhs.Y;
+        }
+
+        public static bool operator !=(Position lhs, Position rhs)
+        {
+            return lhs.X != rhs.X && lhs.Y != rhs.Y;
+        }
+    }
+
+    struct Entity
+    {
+        public Position Position { get; set; }
+        public char Art { get; private set; }
+
+        public Entity(Position position, char art)
+        {
+            Position = position;
+            Art = art;
+        }
+    }
+
     class Program
     {
-        private static bool running = true;
+        private static readonly string _title = "Snake Core | Score: {0} | X: {1}, Y: {2} | Freq: {3}";
+        private static readonly char _snakeArt = '*';
+        private static readonly char _foodArt = 'x';
+        private static readonly char _wallArtHorizontal = '-';
+        private static readonly char _wallArtVertical = '|';
+        private static readonly int _pointsPerFood = 10;
 
-        enum Direction
-        {
-            North,
-            East,
-            South,
-            West
-        }
-
-        struct Position
-        {
-            public int X { get; set; }
-            public int Y { get; set; }
-
-            public Position(int x, int y)
-            {
-                X = x;
-                Y = y;
-            }
-        }
-
-        struct Segment
-        {
-            public Position Position { get; set; }
-
-            public Segment(Position position)
-            {
-                Position = position;
-            }
-        }
+        private static DateTime _startTime;
+        private static int _score;
+        private static bool _running;
+        private static bool _gameOver;
+        private static int _updateFrequency;
+        private static Direction _direction;
+        private static List<Entity> _snake;
+        private static Entity _food;
 
         static void Main(string[] args)
         {
-            var startTime = DateTime.Now;
-            Console.Title = "Snake Core";
+            Init();
 
+            GameLoop();
+        }
+
+        private static void Init()
+        {
+            _startTime = DateTime.Now;
+
+            var windowWidth = 50;
+            var windowHeight = 25;
+            Console.SetWindowSize(windowWidth, windowHeight);
+
+            _score = 0;
+            var x = Console.WindowWidth / 2 - 1;
+            var y = Console.WindowHeight / 2 - 1;
+
+            Console.Title = string.Format(_title, _score, x, y, _updateFrequency);
             Console.CursorVisible = false;
 
-            var startingPos = new Position(Console.WindowWidth / 2 - 1, Console.WindowHeight / 2 - 1);
+            _running = true;
+            _gameOver = false;
+            _updateFrequency = 150;
+            _direction = Direction.North;
 
-            var direction = Direction.North;
+            var startingPos = new Position(x, y);
+            _snake = new List<Entity>
+            {
+                new Entity(new Position(startingPos.X, startingPos.Y), _snakeArt),
+                new Entity(new Position(startingPos.X, startingPos.Y + 1), _snakeArt),
+                new Entity(new Position(startingPos.X, startingPos.Y + 2), _snakeArt),
+                new Entity(new Position(startingPos.X, startingPos.Y + 3), _snakeArt)
+            };
+
+            CreateFood();
+
+            Console.Clear();
 
             DrawBackground();
 
-            var snake = new List<Segment>
-            {
-                new Segment(new Position(startingPos.X, startingPos.Y)),
-                new Segment(new Position(startingPos.X, startingPos.Y + 1)),
-                new Segment(new Position(startingPos.X, startingPos.Y + 2)),
-                new Segment(new Position(startingPos.X, startingPos.Y + 3))
-            };
+            DrawSnake();
 
-            foreach (var segment in snake)
-            {
-                Console.SetCursorPosition(segment.Position.X, segment.Position.Y);
-                Console.Write("*");
-            }
+            DrawFood();
+        }
 
-            while (running)
+        private static void GameLoop()
+        {
+            while (_running)
             {
                 if (Console.KeyAvailable)
                 {
-                    direction = Input(direction);
+                    Input();
+                }
+
+                if (_gameOver)
+                {
                     continue;
                 }
 
-                var timeDifference = DateTime.Now - startTime;
+                var timeDifference = DateTime.Now - _startTime;
                 var timeDifferenceMilliseconds = (int)timeDifference.TotalMilliseconds;
-                const int updateFrequency = 200;
+                int updateFrequency = CalculateUpdateFrequency();
                 if (timeDifferenceMilliseconds >= updateFrequency)
                 {
-                    var head = snake[0];
-                    var tail = snake[snake.Count - 1];
-                    switch (direction)
+                    var head = _snake[0];
+
+                    int minBoundX = 0;
+                    int maxBoundX = Console.WindowWidth - 1;
+                    int minBoundY = 0;
+                    int maxBoundY = Console.WindowHeight - 1;
+                    var hitWall = head.Position.X <= minBoundX || head.Position.X >= maxBoundX ||
+                        head.Position.Y <= minBoundY || head.Position.Y >= maxBoundY;
+
+                    if (hitWall)
                     {
-                        case Direction.North:
-                            if (head.Position.Y > 1)
-                            {
-                                Move(snake, head, tail, new Position(head.Position.X, head.Position.Y - 1));
-                            }
-                            break;
-                        case Direction.East:
-                            if (head.Position.X < Console.WindowWidth - 1)
-                            {
-                                Move(snake, head, tail, new Position(head.Position.X + 1, head.Position.Y));
-                            }
-                            break;
-                        case Direction.South:
-                            if (head.Position.Y < Console.WindowHeight - 1)
-                            {
-                                Move(snake, head, tail, new Position(head.Position.X, head.Position.Y + 1));
-                            }
-                            break;
-                        case Direction.West:
-                            if (head.Position.X > 0)
-                            {
-                                Move(snake, head, tail, new Position(head.Position.X - 1, head.Position.Y));
-                            }
-                            break;
-                        default:
-                            break;
+                        GameOver();
+                        continue;
                     }
 
-                    startTime = DateTime.Now;
+                    var ate = head.Position == _food.Position;
+                    var tail = _snake[_snake.Count - 1];
+
+                    if (ate)
+                    {
+                        Ate();
+                    }
+                    else
+                    {
+                        Move(_snake, head, tail, NextPos());
+                    }
+
+                    SetTitle();
+                    DrawSnake();
+                    _startTime = DateTime.Now;
                 }
             }
         }
 
-        private static Direction Input(Direction dir)
+        private static int CalculateUpdateFrequency()
+        {
+            // The default font on Windows 10 is Consolas and is is 8px x 16px.
+            // When we move vertically we cover twice as much distance which makes the snake
+            // appear faster vertically so we slow down the update frequency for vertical movement.
+            // Todo: Find a way to slow it down based on font used in the console so this works across different fonts.
+            if (_direction == Direction.North || _direction == Direction.South)
+            {
+                return _updateFrequency * 2;
+            }
+
+            return _updateFrequency;
+        }
+
+        private static void Input()
         {
             var key = Console.ReadKey(true);
             switch (key.Key)
             {
                 case ConsoleKey.W:
-                    if (dir != Direction.South)
-                        dir = Direction.North;
+                case ConsoleKey.UpArrow:
+                    if (_direction != Direction.South)
+                        _direction = Direction.North;
                     break;
                 case ConsoleKey.A:
-                    if (dir != Direction.East)
-                        dir = Direction.West;
+                case ConsoleKey.LeftArrow:
+                    if (_direction != Direction.East)
+                        _direction = Direction.West;
                     break;
                 case ConsoleKey.D:
-                    if (dir != Direction.West)
-                        dir = Direction.East;
+                case ConsoleKey.RightArrow:
+                    if (_direction != Direction.West)
+                        _direction = Direction.East;
                     break;
                 case ConsoleKey.S:
-                    if (dir != Direction.North)
-                        dir = Direction.South;
+                case ConsoleKey.DownArrow:
+                    if (_direction != Direction.North)
+                        _direction = Direction.South;
+                    break;
+                case ConsoleKey.R:
+                    Init();
                     break;
                 case ConsoleKey.Escape:
-                    running = false;
+                    _running = false;
+                    break;
+            }
+        }
+
+        private static void Ate()
+        {
+            CreateFood();
+            DrawFood();
+            var currentHead = _snake[0];
+            InsertNewHead(new Entity(NextPos(), _snakeArt));
+            IncreaseSnakeSpeed();
+            _score += _pointsPerFood;
+        }
+
+        private static void InsertNewHead(Entity newHead)
+        {
+            _snake.Insert(0, newHead);
+            Console.SetCursorPosition(newHead.Position.X, newHead.Position.Y);
+        }
+
+        private static Position NextPos()
+        {
+            var head = _snake[0];
+            Position pos = new Position();
+            switch (_direction)
+            {
+                case Direction.North:
+                    pos = new Position(head.Position.X, head.Position.Y - 1);
+                    break;
+                case Direction.East:
+                    pos = new Position(head.Position.X + 1, head.Position.Y);
+                    break;
+                case Direction.South:
+                    pos = new Position(head.Position.X, head.Position.Y + 1);
+                    break;
+                case Direction.West:
+                    pos = new Position(head.Position.X - 1, head.Position.Y);
+                    break;
+                default:
                     break;
             }
 
-            return dir;
+            return pos;
         }
 
-        private static void DrawBackground()
+        private static void CreateFood()
         {
-            Console.SetCursorPosition(1, 0);
-            for (int i = 1; i < Console.WindowWidth - 1; i++)
-                Console.Write("*");
+            // Choose a random position for the food within the bounds of the level.
+            var random = new Random();
+            int randX;
+            int randY;
+            Position randPos;
 
-            for (int i = 1; i < Console.WindowHeight - 1; i++)
+            do
             {
-                Console.SetCursorPosition(1, i);
-                Console.Write("*");
-            }
+                randX = random.Next(2, Console.WindowWidth - 2);
+                randY = random.Next(2, Console.WindowHeight - 2);
 
-            Console.SetCursorPosition(1, Console.WindowHeight - 1);
-            for (int i = 1; i < Console.WindowWidth - 1; i++)
-                Console.Write("*");
+                randPos = new Position(randX, randY);
+            } while (_snake.Exists(x => x.Position == randPos));
 
-            for (int i = 1; i < Console.WindowHeight - 1; i++)
-            {
-                Console.SetCursorPosition(Console.WindowWidth - 2, i);
-                Console.Write("*");
-            }
+            _food = new Entity(randPos, _foodArt);
         }
 
-        private static void Move(List<Segment> snake, Segment head, Segment tail, Position newPosition)
+        private static void Move(List<Entity> snake, Entity head, Entity tail, Position newPosition)
         {
             // To move the snake we make make the current tail segment the new head.
 
@@ -180,6 +285,73 @@ namespace console_snake_core
             snake.Insert(0, newHead);
 
             Console.MoveBufferArea(currentX, currentY, 1, 1, newHead.Position.X, newHead.Position.Y);
+        }
+
+        private static void IncreaseSnakeSpeed()
+        {
+            // To change the snake's speed we change how often the console is updated.
+            const int min = 40;
+            const int max = 150;
+            const int change = 10;
+            _updateFrequency = Math.Clamp(_updateFrequency - change, min, max);
+        }
+
+        private static void SetTitle()
+        {
+            var head = _snake[0];
+            Console.Title = string.Format(_title, _score, head.Position.X, head.Position.Y, _updateFrequency);
+        }
+
+        private static void GameOver()
+        {
+            _gameOver = true;
+            Console.Clear();
+            string gameOver = string.Format("Game Over! You Scored: {0}", _score);
+            int x = Console.WindowWidth / 2;
+            int y = Console.WindowHeight / 2;
+            Console.SetCursorPosition(x - gameOver.Length / 2, y);
+            Console.Write(gameOver);
+            const string restart = "Press [R] to restart or [Esc] to quit.";
+            Console.SetCursorPosition(x - restart.Length / 2, y + 1);
+            Console.Write(restart);
+        }
+
+        private static void DrawBackground()
+        {
+            Console.SetCursorPosition(0, 0);
+            for (int i = 0; i < Console.WindowWidth; i++)
+                Console.Write(_wallArtHorizontal);
+
+            for (int i = 1; i < Console.WindowHeight - 1; i++)
+            {
+                Console.SetCursorPosition(0, i);
+                Console.Write(_wallArtVertical);
+            }
+
+            Console.SetCursorPosition(0, Console.WindowHeight - 1);
+            for (int i = 0; i < Console.WindowWidth; i++)
+                Console.Write(_wallArtHorizontal);
+
+            for (int i = 1; i < Console.WindowHeight - 1; i++)
+            {
+                Console.SetCursorPosition(Console.WindowWidth - 1, i);
+                Console.Write(_wallArtVertical);
+            }
+        }
+
+        private static void DrawFood()
+        {
+            Console.SetCursorPosition(_food.Position.X, _food.Position.Y);
+            Console.Write(_food.Art);
+        }
+
+        private static void DrawSnake()
+        {
+            foreach (var segment in _snake)
+            {
+                Console.SetCursorPosition(segment.Position.X, segment.Position.Y);
+                Console.Write(segment.Art);
+            }
         }
     }
 }
