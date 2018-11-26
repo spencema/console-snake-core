@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace console_snake_core
 {
@@ -139,6 +140,14 @@ namespace console_snake_core
                         head.Position.Y <= minBoundY || head.Position.Y >= maxBoundY;
 
                     if (hitWall)
+                    {
+                        GameOver();
+                        continue;
+                    }
+
+                    var collidedSelf = _snake.GetRange(1, _snake.Count - 1).Where(segment => segment.Position == head.Position).Any();
+
+                    if (collidedSelf)
                     {
                         GameOver();
                         continue;
