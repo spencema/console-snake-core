@@ -60,6 +60,7 @@ namespace console_snake_core
         private static bool _running;
         private static bool _gameOver;
         private static int _updateFrequency;
+        private static int _maxUpdateFrequency;
         private static Direction _direction;
         private static List<Entity> _snake;
         private static Entity _food;
@@ -88,7 +89,8 @@ namespace console_snake_core
 
             _running = true;
             _gameOver = false;
-            _updateFrequency = 150;
+            _updateFrequency = 110;
+            _maxUpdateFrequency = _updateFrequency;
             _direction = Direction.North;
 
             var startingPos = new Position(x, y);
@@ -299,9 +301,9 @@ namespace console_snake_core
         private static void IncreaseSnakeSpeed()
         {
             // To change the snake's speed we change how often the console is updated.
-            const int min = 40;
-            const int max = 150;
-            const int change = 10;
+            int min = 40;
+            int max = _maxUpdateFrequency;
+            int change = 10;
             _updateFrequency = Math.Clamp(_updateFrequency - change, min, max);
         }
 
