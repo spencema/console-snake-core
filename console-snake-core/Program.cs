@@ -12,40 +12,6 @@ namespace console_snake_core
         West
     }
 
-    struct Position
-    {
-        public int X { get; set; }
-        public int Y { get; set; }
-
-        public Position(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
-
-        public static bool operator ==(Position lhs, Position rhs)
-        {
-            return lhs.X == rhs.X && lhs.Y == rhs.Y;
-        }
-
-        public static bool operator !=(Position lhs, Position rhs)
-        {
-            return lhs.X != rhs.X && lhs.Y != rhs.Y;
-        }
-    }
-
-    struct Entity
-    {
-        public Position Position { get; set; }
-        public char Art { get; private set; }
-
-        public Entity(Position position, char art)
-        {
-            Position = position;
-            Art = art;
-        }
-    }
-
     class Program
     {
         private static readonly string _title = "Snake Core | Score: {0} | X: {1}, Y: {2} | Freq: {3}";
@@ -122,56 +88,54 @@ namespace console_snake_core
                     Input();
                 }
 
-                if (_gameOver)
+                if (!_gameOver)
                 {
-                    continue;
-                }
-
-                var timeDifference = DateTime.Now - _startTime;
-                var timeDifferenceMilliseconds = (int)timeDifference.TotalMilliseconds;
-                int updateFrequency = CalculateUpdateFrequency();
-                if (timeDifferenceMilliseconds >= updateFrequency)
-                {
-                    var head = _snake[0];
-
-                    int minBoundX = 0;
-                    int maxBoundX = Console.WindowWidth - 1;
-                    int minBoundY = 0;
-                    int maxBoundY = Console.WindowHeight - 1;
-                    var hitWall = head.Position.X <= minBoundX || head.Position.X >= maxBoundX ||
-                        head.Position.Y <= minBoundY || head.Position.Y >= maxBoundY;
-
-                    if (hitWall)
+                    var timeDifference = DateTime.Now - _startTime;
+                    var timeDifferenceMilliseconds = (int)timeDifference.TotalMilliseconds;
+                    int updateFrequency = CalculateUpdateFrequency();
+                    if (timeDifferenceMilliseconds >= updateFrequency)
                     {
-                        GameOver();
-                        continue;
+                        if (HitWall())
+                        {
+                            GameOver();
+                            continue;
+                        }
+
+                        var head = GetHead();
+                        var collidedSelf = _snake.GetRange(1, _snake.Count - 1).Where(segment => segment.Position == head.Position).Any();
+
+                        if (collidedSelf)
+                        {
+                            GameOver();
+                            continue;
+                        }
+
+                        if (head.Position == _food.Position)
+                        {
+                            Ate();
+                        }
+                        else
+                        {
+                            Move(_snake, NextPos());
+                        }
+
+                        UpdateTitle();
+                        DrawSnake();
+                        _startTime = DateTime.Now;
                     }
-
-                    var collidedSelf = _snake.GetRange(1, _snake.Count - 1).Where(segment => segment.Position == head.Position).Any();
-
-                    if (collidedSelf)
-                    {
-                        GameOver();
-                        continue;
-                    }
-
-                    var ate = head.Position == _food.Position;
-                    var tail = _snake[_snake.Count - 1];
-
-                    if (ate)
-                    {
-                        Ate();
-                    }
-                    else
-                    {
-                        Move(_snake, head, tail, NextPos());
-                    }
-
-                    SetTitle();
-                    DrawSnake();
-                    _startTime = DateTime.Now;
                 }
             }
+        }
+
+        private static bool HitWall()
+        {
+            int minBoundX = 0;
+            int maxBoundX = Console.WindowWidth - 1;
+            int minBoundY = 0;
+            int maxBoundY = Console.WindowHeight - 1;
+            var head = GetHead();
+            return head.Position.X <= minBoundX || head.Position.X >= maxBoundX ||
+                head.Position.Y <= minBoundY || head.Position.Y >= maxBoundY;
         }
 
         private static int CalculateUpdateFrequency()
@@ -282,10 +246,10 @@ namespace console_snake_core
             _food = new Entity(randPos, _foodArt);
         }
 
-        private static void Move(List<Entity> snake, Entity head, Entity tail, Position newPosition)
+        private static void Move(List<Entity> snake, Position newPosition)
         {
             // To move the snake we make make the current tail segment the new head.
-
+            var tail = GetTail();
             snake.RemoveAt(snake.Count - 1);
 
             int currentX = tail.Position.X;
@@ -307,7 +271,7 @@ namespace console_snake_core
             _updateFrequency = Math.Clamp(_updateFrequency - change, min, max);
         }
 
-        private static void SetTitle()
+        private static void UpdateTitle()
         {
             var head = _snake[0];
             Console.Title = string.Format(_title, _score, head.Position.X, head.Position.Y, _updateFrequency);
@@ -363,6 +327,16 @@ namespace console_snake_core
                 Console.SetCursorPosition(segment.Position.X, segment.Position.Y);
                 Console.Write(segment.Art);
             }
+        }
+
+        private static Entity GetHead()
+        {
+            return _snake[0];
+        }
+
+        private static Entity GetTail()
+        {
+            return _snake[_snake.Count - 1];
         }
     }
 }
