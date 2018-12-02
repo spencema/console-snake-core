@@ -30,6 +30,9 @@ namespace console_snake_core
         private static Direction _direction;
         private static List<Entity> _snake;
         private static Entity _food;
+        private static bool _canProcessInput = false;
+        private static ConsoleKeyInfo _previousKey;
+        private static ConsoleKeyInfo _key;
 
         static void Main(string[] args)
         {
@@ -85,7 +88,12 @@ namespace console_snake_core
             {
                 if (Console.KeyAvailable)
                 {
-                    Input();
+                    // During gameplay we want every input to have to have its movement drawn before processing anymore input,
+                    // otherwise the position of the snake can be out of sync with what is drawn and you can end up colliding with yourself unintentionally.
+                    if (_gameOver || _canProcessInput)
+                    {
+                        Input();
+                    }
                 }
 
                 if (!_gameOver)
@@ -121,6 +129,7 @@ namespace console_snake_core
 
                         UpdateTitle();
                         DrawSnake();
+                        _canProcessInput = true;
                         _startTime = DateTime.Now;
                     }
                 }
@@ -154,8 +163,17 @@ namespace console_snake_core
 
         private static void Input()
         {
-            var key = Console.ReadKey(true);
-            switch (key.Key)
+            _previousKey = _key;
+            _key = Console.ReadKey(true);
+
+            // If the key pressed is the same as the old one then there's no point processing it.
+            if (_previousKey.Key == _key.Key)
+            {
+                return;
+            }
+
+            _canProcessInput = false;
+            switch (_key.Key)
             {
                 case ConsoleKey.W:
                 case ConsoleKey.UpArrow:
